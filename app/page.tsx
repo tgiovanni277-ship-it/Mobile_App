@@ -1,0 +1,60 @@
+'use client';
+import {useState, useEffect} from 'react';
+import {Search, ShoppingBag, Heart, X, Minus, Plus, ArrowRight, Menu} from 'lucide-react';
+const products = [
+ {id:1,name:'Phone Pro',category:'Celulares',detail:'256 GB · Titanio natural',price:2499000,image:'photo-1592750475338-74b7b21085ab'},
+ {id:2,name:'Air Sound',category:'Audio',detail:'Audífonos inalámbricos · Blanco',price:249000,image:'photo-1606220945770-b5b6c2c55bf1'},
+ {id:3,name:'Studio Headphones',category:'Audio',detail:'Sonido envolvente · Negro',price:599000,image:'photo-1546435770-a3e426bf472b'},
+ {id:4,name:'Watch Active',category:'Accesorios',detail:'Tu día, conectado · Negro',price:399000,image:'photo-1523275335684-37898b6baf30'},
+ {id:5,name:'Phone Essential',category:'Celulares',detail:'128 GB · Negro',price:1299000,image:'photo-1511707171634-5f897ff02aa9'},
+ {id:6,name:'Sound Anywhere',category:'Audio',detail:'Parlante portátil · Negro',price:189000,image:'photo-1608043152269-423dbba4e7e1'}
+];
+const money=(n:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n);
+const photo=(id:string,w=800)=>`https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=85`;
+export default function Home(){
+ const [category,setCategory]=useState('Todo'),[query,setQuery]=useState(''),[favorites,setFavorites]=useState<number[]>([]),[cart,setCart]=useState<Record<number,number>>({}),[bag,setBag]=useState(false),[onlyFavorites,setOnlyFavorites]=useState(false),[selected,setSelected]=useState<typeof products[number]|null>(null),[ready,setReady]=useState(false),[notice,setNotice]=useState(''),[menu,setMenu]=useState(false);
+ useEffect(() => {
+  try {
+   const storedCart: unknown = JSON.parse(localStorage.getItem('ts-cart') || '{}');
+   const storedFavorites: unknown = JSON.parse(localStorage.getItem('ts-favorites') || '[]');
+   const validCart: Record<number, number> = {};
+   if (storedCart && typeof storedCart === 'object' && !Array.isArray(storedCart)) {
+    for (const [key, quantity] of Object.entries(storedCart)) {
+     const id = Number(key);
+     if (products.some(product => product.id === id) && typeof quantity === 'number' && Number.isInteger(quantity) && quantity > 0 && quantity <= 10) {
+      validCart[id] = quantity;
+     }
+    }
+   }
+   setCart(validCart);
+   if (Array.isArray(storedFavorites)) {
+    setFavorites(storedFavorites.filter((id): id is number => typeof id === 'number' && products.some(product => product.id === id)));
+   }
+  } catch {
+   // Ignore malformed browser data and use the initial empty state.
+  }
+  setReady(true);
+ }, []);
+ useEffect(()=>{if(ready)try{localStorage.setItem('ts-cart',JSON.stringify(cart));localStorage.setItem('ts-favorites',JSON.stringify(favorites))}catch{}},[cart,favorites,ready]);
+ useEffect(()=>{if(!bag&&!selected)return;const previous=document.activeElement as HTMLElement|null;const old=document.body.style.overflow;document.body.style.overflow='hidden';const listener=(e:KeyboardEvent)=>{if(e.key==='Escape'){setBag(false);setSelected(null)}if(e.key==='Tab'){const items=Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"] button:not(:disabled),[role="dialog"] a[href],[role="dialog"] input'));const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};document.addEventListener('keydown',listener);return()=>{document.body.style.overflow=old;document.removeEventListener('keydown',listener);previous?.focus()}},[bag,selected]);
+ const count=Object.values(cart).reduce((a,b)=>a+b,0),total=products.reduce((a,p)=>a+p.price*(cart[p.id]||0),0);
+ const shown=products.filter(p=>(category==='Todo'||p.category===category)&&(!onlyFavorites||favorites.includes(p.id))&&`${p.name} ${p.category} ${p.detail}`.toLowerCase().includes(query.toLowerCase()));
+ function browse(c='Todo'){setCategory(c);setOnlyFavorites(false);setMenu(false);document.getElementById('catalogo')?.scrollIntoView({behavior:'smooth'})}
+ function add(id:number){setCart(c=>({...c,[id]:Math.min(10,(c[id]||0)+1)}));setSelected(null);setBag(true)}
+ function favorite(id:number){setFavorites(f=>f.includes(id)?f.filter(x=>x!==id):[...f,id])}
+ return <>
+ <a className="skip" href="#catalogo">Ir a productos</a>
+ <div className="utility"><span>TECNOLOGÍA PARA TU DÍA A DÍA</span><span>Tienda de demostración · Colombia</span></div>
+ <header><a className="brand" href="#">TecnoSystem<span>®</span></a><nav aria-label="Categorías principales">{['Celulares','Audio','Accesorios'].map(c=><button key={c} onClick={()=>browse(c)}>{c}</button>)}</nav><div className="tools"><label className="search"><Search size={19}/><input aria-label="Buscar productos" placeholder="Buscar" value={query} onChange={e=>{setQuery(e.target.value);document.getElementById('catalogo')?.scrollIntoView({behavior:'smooth'})}}/></label><button className="icon favorites-desktop" aria-label="Ver favoritos" onClick={()=>{setOnlyFavorites(true);setCategory('Todo');document.getElementById('catalogo')?.scrollIntoView()}}><Heart size={23}/></button><button className="icon bag-icon" aria-label={`Abrir bolsa, ${count} productos`} onClick={()=>setBag(true)}><ShoppingBag size={23}/>{count>0&&<b>{count}</b>}</button><button className="icon mobile-menu" aria-label="Abrir menú" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Menu/></button></div></header>
+ {menu&&<div className="mobile-categories">{['Todo','Celulares','Audio','Accesorios'].map(c=><button key={c} onClick={()=>browse(c)}>{c}</button>)}<input aria-label="Buscar en catálogo" placeholder="Buscar productos" value={query} onChange={e=>setQuery(e.target.value)}/></div>}
+ <div className="subnav"><span>Explora TecnoSystem</span><div>{['Lo nuevo','Celulares','Audio','Accesorios'].map(c=><button key={c} onClick={()=>browse(c==='Lo nuevo'?'Todo':c)}>{c}</button>)}</div></div>
+ <main><section className="hero" aria-labelledby="hero-title"><img src={photo('photo-1546435770-a3e426bf472b',2000)} alt="Audífonos negros de diadema sobre fondo oscuro" fetchPriority="high"/><div className="hero-shade"/><div className="hero-copy"><p>ESCUCHA. CONECTA. DESCUBRE.</p><h1 id="hero-title">TECNOLOGÍA<br/>A TU RITMO.</h1><p className="hero-description">El sonido que te mueve. La tecnología que va contigo.</p><button className="pill white" onClick={()=>browse()}>Explorar productos <ArrowRight size={17}/></button></div><span className="hero-caption">AUDIO / NUEVA SELECCIÓN</span></section>
+ <section className="intro"><p>HECHO PARA TU DÍA</p><h2>Conecta con lo que te mueve.</h2><p>Celulares, audio y accesorios. Encuentra tu próximo favorito.</p><button className="pill" onClick={()=>browse()}>Ver colección</button></section>
+ <section className="catalog" id="catalogo"><div className="section-heading"><h2>{onlyFavorites?'Tus favoritos':'Tus próximos favoritos'}</h2><span>{shown.length} productos</span></div><div className="filters" aria-label="Filtrar productos">{['Todo','Celulares','Audio','Accesorios'].map(c=><button aria-pressed={category===c} className={category===c?'active':''} key={c} onClick={()=>setCategory(c)}>{c}</button>)}{onlyFavorites&&<button onClick={()=>setOnlyFavorites(false)}>Ver todos</button>}</div><div className="product-grid">{shown.map(p=><article key={p.id}><div className="product-image"><button className="product-open" onClick={()=>setSelected(p)} aria-label={`Ver ${p.name}`}><img src={photo(p.image)} alt={p.name} loading="lazy"/></button><button className={`favorite ${favorites.includes(p.id)?'saved':''}`} aria-label={`${favorites.includes(p.id)?'Quitar de':'Agregar a'} favoritos ${p.name}`} aria-pressed={favorites.includes(p.id)} onClick={()=>favorite(p.id)}><Heart size={21}/></button></div><div className="product-info"><div><button className="product-title" onClick={()=>setSelected(p)}>{p.name}</button><p>{p.detail}</p><strong>{money(p.price)}</strong></div><button className="add" aria-label={`Agregar ${p.name} a la bolsa`} onClick={()=>add(p.id)}><Plus size={20}/></button></div></article>)}</div>{shown.length===0&&<div className="empty"><h3>No encontramos productos</h3><p>Prueba otra búsqueda o categoría.</p><button className="pill" onClick={()=>{setQuery('');setCategory('Todo');setOnlyFavorites(false)}}>Ver catálogo</button></div>}</section>
+ <section className="editorial"><button onClick={()=>browse('Celulares')}><img src={photo('photo-1511707171634-5f897ff02aa9',1200)} alt="Celular en primer plano" loading="lazy"/><div><p>SIEMPRE CONTIGO</p><h2>Tu mundo.<br/>Más cerca.</h2><span className="pill white">Explorar celulares</span></div></button><button onClick={()=>browse('Audio')}><img src={photo('photo-1484704849700-f032a568e944',1200)} alt="Audífonos para disfrutar de tu música" loading="lazy"/><div><p>DALE PLAY A TU DÍA</p><h2>Sube el volumen.<br/>Sigue tu ritmo.</h2><span className="pill white">Descubrir audio</span></div></button></section>
+ <section className="closing"><p>TU PRÓXIMA CONEXIÓN EMPIEZA AQUÍ.</p><h2>Encuentra lo tuyo.</h2><button className="pill" onClick={()=>browse()}>Explorar todo <ArrowRight size={17}/></button></section></main>
+ <footer><div className="footer-top"><a className="brand" href="#">TecnoSystem</a><div><p>EXPLORAR</p>{['Celulares','Audio','Accesorios'].map(c=><button key={c} onClick={()=>browse(c)}>{c}</button>)}</div><div><p>EL PROYECTO</p><span>Una experiencia de tecnología.</span><span>Diseñada para aprender y conectar.</span></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} TecnoSystem · Colombia</span><span>Demo de portafolio. Productos y precios ilustrativos. Sin pagos reales.</span></div></footer>
+ <nav className="bottom-nav" aria-label="Navegación móvil"><button onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>Inicio</button><button onClick={()=>browse()}>Explorar</button><button onClick={()=>{setOnlyFavorites(true);setCategory('Todo');document.getElementById('catalogo')?.scrollIntoView()}}>Favoritos ({favorites.length})</button><button onClick={()=>setBag(true)}>Bolsa ({count})</button></nav>
+ {(bag||selected)&&<div className="overlay" onClick={()=>{setBag(false);setSelected(null)}}><section className={bag?'drawer':'modal'} role="dialog" aria-modal="true" aria-label={bag?'Tu bolsa':selected?.name} onClick={e=>e.stopPropagation()}><button autoFocus className="close icon" aria-label="Cerrar" onClick={()=>{setBag(false);setSelected(null)}}><X/></button>{bag?<><h2>Tu bolsa <span>({count})</span></h2>{count===0?<div className="empty"><ShoppingBag size={40}/><h3>Tu bolsa está esperando</h3><p>Encuentra algo que vaya contigo.</p><button className="pill" onClick={()=>{setBag(false);browse()}}>Explorar productos</button></div>:<><div className="cart-items">{products.filter(p=>cart[p.id]).map(p=><div className="cart-item" key={p.id}><img src={photo(p.image,200)} alt={p.name}/><div><h3>{p.name}</h3><p>{money(p.price)}</p><div className="quantity"><button aria-label={`Reducir cantidad de ${p.name}`} onClick={()=>setCart(c=>{const n={...c};if(n[p.id]<=1)delete n[p.id];else n[p.id]--;return n})}><Minus size={14}/></button><span>{cart[p.id]}</span><button disabled={cart[p.id]>=10} aria-label={`Aumentar cantidad de ${p.name}`} onClick={()=>setCart(c=>({...c,[p.id]:Math.min(10,c[p.id]+1)}))}><Plus size={14}/></button></div></div></div>)}</div><div className="cart-total"><p><span>Subtotal</span><strong>{money(total)}</strong></p><small>Compra de demostración. No se realizará ningún cobro.</small><button className="pill" onClick={()=>setNotice('Tu bolsa está lista. La creación de pedidos llegará con Supabase.')}>Continuar con la demo <ArrowRight size={18}/></button><p role="status">{notice}</p></div></>}</>:selected&&<><img className="detail-image" src={photo(selected.image)} alt={selected.name}/><p>{selected.category}</p><h2>{selected.name}</h2><p>{selected.detail}</p><strong>{money(selected.price)}</strong><button className="pill" onClick={()=>add(selected.id)}>Agregar a la bolsa <ShoppingBag size={18}/></button></>}</section></div>}
+ </>;
+}
